@@ -7,6 +7,7 @@ use std::io::{BufRead, BufReader, Read};
 
 use anyhow::Result;
 use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag};
+use regex::Regex;
 
 trait CodeBlockKindExt {
     /// Determines whether this code block should be included in output.
@@ -66,7 +67,6 @@ fn filter_markdown(os: impl Read, md: &str) -> Result<impl '_ + Iterator<Item = 
         }
 
         Event::Text(text) if dump => Some(text.to_string()),
-
         _ => None,
     }))
 }
@@ -84,10 +84,16 @@ fn main() -> Result<()> {
         }
     };
 
+    let re = Regex::new(r"^\s*[\$|#]\s*(?P<command>.+?)\s*").unwrap();
     let os = args.next().unwrap_or_else(|| "/etc/os-release".to_owned());
 
     for cmd in filter_markdown(File::open(os)?, &md)? {
-        print!("{}", cmd);
+        for line in cmd.lines() {
+            let cleaned_line = re.replace_all(line, "$command").to_string();
+            if cleaned_line.len() > 1 {
+                println!("{}", cleaned_line);
+            }
+        }
     }
 
     Ok(())
