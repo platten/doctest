@@ -8,6 +8,7 @@ use std::ops::Deref;
 
 use anyhow::{anyhow, Result};
 use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag};
+use regex::Regex;
 
 trait CodeBlockKindExt {
     /// Determines whether this code block should be included in output.
@@ -76,7 +77,6 @@ fn filter_markdown<'a>(
         }
 
         Event::Text(text) if dump => Some(text.to_string()),
-
         _ => None,
     }))
 }
@@ -98,9 +98,14 @@ fn main() -> Result<()> {
         .next()
         .map(|s| s.split(',').map(Into::into).collect())
         .unwrap_or_default();
-
+    let re = Regex::new(r"^\s*[\$|#]\s*(?P<command>.+?)\s*").unwrap();
     for cmd in filter_markdown(&cx, File::open(os)?, &md)? {
-        print!("{}", cmd);
+        for line in cmd.lines() {
+            let cleaned_line = re.replace_all(line, "$command").to_string();
+            if cleaned_line.len() > 1 {
+                println!("{}", cleaned_line);
+            }
+        }
     }
 
     Ok(())
